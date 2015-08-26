@@ -15,6 +15,15 @@ catch{
 }
 
 #Test the presence of the Content Directory
+if($IISContentDirectory -ne $null){
+    if(Test-Path $IISContentDirectory){
+        Write-Output "IIS Content Directory Found"
+    }
+    else{
+        Write-Output "IIS Content Directory Not Found"
+        throw "IIS Content Directory Bad Path, $IISContentDirectory"
+    }
+}
 
 #Verify that VM switch is NAT
 $vmswitch = Get-VMSwitch | ?{$_.SwitchType -eq "NAT"}

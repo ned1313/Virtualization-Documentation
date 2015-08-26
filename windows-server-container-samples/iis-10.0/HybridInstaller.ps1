@@ -23,14 +23,6 @@ $containerScript = {
     Add-WindowsFeature Web-Server
 }
 
-$getInternalIPScript = {
-        #Get the IPv4 Address of the Container NIC
-        Get-NetIPAddress | ?{$_.InterfaceAlias -like "vEthernet*" -and $_.AddressFamily -eq "IPv4"} -ov netip | Out-Null
-
-        #Return the output to the pipeline
-        Write-Output $netip.IPAddress
-    }
-
 If ($RunNative)
 {
     Write-Output "Running natively (or inside a Container) - simply executing the script block"
