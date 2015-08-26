@@ -23,6 +23,14 @@ $containerScript = {
     Add-WindowsFeature Web-Server
 }
 
+$getInternalIPScript = {
+        #Get the IPv4 Address of the Container NIC
+        Get-NetIPAddress | ?{$_.InterfaceAlias -like "vEthernet*" -and $_.AddressFamily -eq "IPv4"} -ov netip | Out-Null
+
+        #Return the output to the pipeline
+        Write-Output $netip.IPAddress
+    }
+
 If ($RunNative)
 {
     Write-Output "Running natively (or inside a Container) - simply executing the script block"
@@ -38,6 +46,25 @@ ElseIf ($CreateContainerImageUsingPowerShell)
 
       Write-Output "Running Script Block inside Container"
       Invoke-Command -ContainerId $c1.Id -RunAsAdministrator -ScriptBlock $containerScript
+
+      Write-Output "Collecting the Internal IP Address of the Container"
+      $containerInternalIPAddress = Invoke-Command -ContainerId $c1.Id -RunAsAdministrator -ScriptBlock $getInternalIPScript
+
+      Write-Output "Container IP Address is $containerInternalIPAddress"
+      Write-Output "Creating NAT Mapping Rule and Firewall Port Exception"
+      Add-NetNatStaticMapping -NatName (Get-NetNat).Name -Protocol TCP -ExternalIPAddress 0.0.0.0 -InternalIPAddress $containerIPAddress -InternalPort 80 -ExternalPort 80
+      if (!(Get-NetFirewallRule | where {$_.Name -eq "TCP80"})) {
+        New-NetFirewallRule -Name "TCP80" -DisplayName "HTTP on TCP/80" -Protocol tcp -LocalPort 80 -Action Allow -Enabled True
+      }
+
+      #Try to load default IIS web page
+      try{
+        $statusCode = (wget -uri http://$containerIPAddress -UseBasicParsing).statuscode
+        Write-Output "Testing IIS default page succedeed with status code $statusCode"
+      }
+      catch{
+        Write-Output "Testing IIS default page failed with error: $_"
+      }
 
       Write-Output "Stopping $($c1.Name)"
       Stop-Container $c1
